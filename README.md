@@ -7,10 +7,6 @@ DAG Factory and explore how this tool enables bulk DAG creation without introduc
 extensive code.
 
 
-### What You'll Build
-
-
-
 ### What You'll Learn
 
 - How to author DAGs using DAG Factory and YAML files.
@@ -44,8 +40,9 @@ Awesome, let's get started!
 ### Building a Basic DAG
 
 Authoring a DAG with DAG Factory requires two files; a `.yml` file, and `.py` file. The `.yml` file contains things
-like a DAG ID, start date, schedule interval, as well as Task definitions and their dependencies. The `.py` file reads
-this YAML file, and generates the resulting DAG.
+like a DAG ID, start date, schedule interval, as well as Task definitions and their dependencies. This is the 
+information that will be used to generate your DAG. The `.py` file reads this YAML file, and generates the resulting 
+DAG.
 
 In the `dags/` directory, we've defined DAG using the `basic_dag.yml` and `basic_dag.py` files. This DAG is quite 
 simple; it has three Tasks (`extract`, `transform`, and `load`) each implemented with the `EmptyOperator`. The syntax 
@@ -66,9 +63,10 @@ basic_etl:
       operator: airflow.operators.empty.EmptyOperator
 ```
 
-Once the YAML file has been populated, we'll need a `.py` file to make sure the DAG is generated properly. This code is 
-mostly boilerplate, and will remain the same for almost all DAGs authored using DAG Factory. Here's what that looks 
-like:
+Once the YAML file has been populated, we'll need a `.py` file to make sure the DAG is generated. This code is mostly 
+boilerplate, and will remain the same for almost all DAGs authored using DAG Factory. Here's what that looks like the 
+code snippet below. Typically, the only thing that will change from DAG-to-DAG will be the file path pass to 
+`DagFactory()`.
 
 ```python
 from dagfactory import DagFactory
@@ -80,6 +78,11 @@ dag_factory: DagFactory = DagFactory("/usr/local/airflow/dags/basic_dag.yml")
 dag_factory.clean_dags(globals())
 dag_factory.generate_dags(globals())
 ```
+
+That's it! In just four lines of Python, and a little bit of JSON, you've authored a DAG using DAG Factory. When you 
+open your local instance of Airflow, you'll see a graph view that looks like the snip below.
+
+![Graph view of a DAG built using DAG Factory.](assets/basic_dag__graph_view.png)
 
 
 ### Building an ETL Pipeline
