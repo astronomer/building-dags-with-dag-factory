@@ -1,12 +1,12 @@
-basic_etl:
+basic_dag:
   default_args:
     start_date: "2024-01-01"
   schedule_interval: "0 0 * * *"
   catchup: False
   tasks:
-    extract:
+    task_a:
       operator: airflow.operators.empty.EmptyOperator
-    transform:
+    task_b:
       operator: airflow.operators.empty.EmptyOperator
-    load:
+    task_c:
       operator: airflow.operators.empty.EmptyOperator
