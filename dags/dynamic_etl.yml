@@ -1,4 +1,4 @@
-business_analytics:
+default:
   catchup: false
   default_args:
     start_date: '2024-01-01'
@@ -11,71 +11,36 @@ business_analytics:
     load:
       dependencies:
       - transform
+      operator: airflow.operators.python.PythonOperator
+      python_callable_file: /usr/local/airflow/include/etl_helpers.py
+      python_callable_name: load_helper
+    transform:
+      dependencies:
+      - extract
+      op_kwargs:
+        ds_nodash: '{{ds_nodash}}'
+      operator: airflow.operators.python.PythonOperator
+      python_callable_file: /usr/local/airflow/include/etl_helpers.py
+      python_callable_name: transform_helper
+
+
+business_analytics:
+  tasks:
+    load:
       op_kwargs:
         database_name: BA
         table_name: inventory
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: load_helper
-    transform:
-      dependencies:
-      - extract
-      op_kwargs:
-        ds_nodash: '{{ds_nodash}}'
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: transform_helper
+
 data_science:
-  catchup: false
-  default_args:
-    start_date: '2024-01-01'
-  schedule_interval: 0 0 * * *
   tasks:
-    extract:
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: extract_helper
     load:
-      dependencies:
-      - transform
       op_kwargs:
         database_name: DS
-        table_name: daily_sales
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: load_helper
-    transform:
-      dependencies:
-      - extract
-      op_kwargs:
-        ds_nodash: '{{ds_nodash}}'
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: transform_helper
+        table_name: daily_sames
+
 machine_learning:
-  catchup: false
-  default_args:
-    start_date: '2024-01-01'
-  schedule_interval: 0 0 * * *
   tasks:
-    extract:
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: extract_helper
     load:
-      dependencies:
-      - transform
       op_kwargs:
         database_name: ML
         table_name: training_data
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: load_helper
-    transform:
-      dependencies:
-      - extract
-      op_kwargs:
-        ds_nodash: '{{ds_nodash}}'
-      operator: airflow.operators.python.PythonOperator
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      python_callable_name: transform_helper

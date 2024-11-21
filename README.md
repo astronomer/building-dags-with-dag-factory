@@ -29,10 +29,8 @@ To pull this code down onto your local machine, create a new directory and run t
 project, run `astro dev start`. This will spin up an instance of Airflow on your machine, available via 
 `localhost:8080`.
 
-There are two packages needed to get started with this project, both of which are provided in the `requirements.txt` 
-file. The first is `dag-factory`, which will be used as we define DAGs using YAML. The second is `PyYAML`, which we'll 
-use in `include/scripts/generate_dynamic_dag.py` script to dynamically create YAML files using a template. You don't 
-have to install these locally; running `astro dev start` will do so in your Docker containers.
+To get started with this tutorial, you'll need to add the `dag-factory` package to your `requirements.txt` file. You 
+don't have to install `dag-factory` locally; running `astro dev start` will do so in your Docker containers.
 
 Awesome, let's get started!
 
@@ -148,87 +146,79 @@ in order to generate our DAG. The resulting graph view should look something lik
 ![Graph view of an ETL DAG built using DAG Factory.](assets/etl__graph_view.png)
 
 
-### Dynamically-Generating DAGs Using Templating
+### Dynamically-Generating DAGs Using `default`
 
 Fantastic! Now that we've mastered creating DAGs using DAG Factory, we're going to try to do something a little more 
-difficult; generating DAGs dynamically. To do this, we'll be using two new files:
+difficult; generating DAGs dynamically. To do this, we'll be using the `dynamic_etl.yml` file.
 
-- `include/scripts/template.yml`
-- `include/scripts/generate_dynamic_dag.py`
+At first glance, this file might feel quite similar to `etl.yml`. However, there's one big difference; at the top of 
+`dynamic_etl.yml`, you'll see `default`, followed by YAML configuration that closely mirrors what we had seen in 
+`etl.yml`. We're going to use a single "default" configuration to build multiple DAGs. 
 
-The `template.yml` file looks very similar to the `etl.yml` file from above. However, you'll see a few places where 
-these two files are different. In `template.yml`, there are three fields that are denoted as templated using `<< >>`. 
-These include the `dag_id`, as well as the values being passed to the `database_name` and `table_name` keys. This is a 
-very common pattern for teams looking to use a single DAG configuration to spawn similar (but slightly different) DAGs.
+`default` offers a sort of template to more easily define multiple DAGs without having to copy-and-paste. How does this 
+work? DAG Factory uses the configuration defined in `default` and applies it to each of the `business_analytics`, 
+`data_science`, and `machine_learning` DAGs outlined below. Then, the default values are supplemented with the values 
+provide for each implementation of the default configuration. Since the only real difference between these DAGs are the 
+`op_kwargs` passed into the `load_helper()` function, there's no need to copy and paste the entire configuration three 
+times. This allows for us to use a single "templated" DAG configuration to define three similar, but distinct, DAGs.
 
 ```yaml
-<< dag_id >>:
+default:
+  catchup: false
   default_args:
-    start_date: "2024-01-01"
-  schedule_interval: "0 0 * * *"
-  catchup: False
+    start_date: '2024-01-01'
+  schedule_interval: 0 0 * * *
   tasks:
     extract:
       operator: airflow.operators.python.PythonOperator
+      python_callable_file: /usr/local/airflow/include/etl_helpers.py
       python_callable_name: extract_helper
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-    transform:
-      operator: airflow.operators.python.PythonOperator
-      python_callable_name: transform_helper
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      op_kwargs:
-        ds_nodash: "{{ds_nodash}}"
-      dependencies:
-        - extract
     load:
-      operator: airflow.operators.python.PythonOperator
-      python_callable_name: load_helper
-      python_callable_file: /usr/local/airflow/include/etl_helpers.py
-      op_kwargs:
-        database_name: "<< database_name >>"
-        table_name: "<< table_name >>"
       dependencies:
-        - transform
+      - transform
+      operator: airflow.operators.python.PythonOperator
+      python_callable_file: /usr/local/airflow/include/etl_helpers.py
+      python_callable_name: load_helper
+    transform:
+      dependencies:
+      - extract
+      op_kwargs:
+        ds_nodash: '{{ds_nodash}}'
+      operator: airflow.operators.python.PythonOperator
+      python_callable_file: /usr/local/airflow/include/etl_helpers.py
+      python_callable_name: transform_helper
+
+
+business_analytics:
+  tasks:
+    load:
+      op_kwargs:
+        database_name: BA
+        table_name: inventory
+
+data_science:
+  tasks:
+    load:
+      op_kwargs:
+        database_name: DS
+        table_name: daily_sames
+
+machine_learning:
+  tasks:
+    load:
+      op_kwargs:
+        database_name: ML
+        table_name: training_data
+
 ```
 
-Next, we need a way to inject value to these variables. We'll do that using the `generate_dynamic_dag.py` script in 
-the `include/scripts/` directory. This script uses the list of dictionaries in the `TEMPLATE_VARIABLES` object below to
-inject parameters into the template. You can use this script for almost any template that you'd like to inject 
-parameters into. To do this, make sure to update name of the template file that is being read from, as well as the 
-target YAML file that the resulting configuration is being written to. Once these have been injected, a new file will 
-be written into the DAGs directory. This file has name `dynamic_etl.yml`, and contains the configuration for three DAGs. 
-It's quite long, so it's not included here. 
-
-```python
-...
-
-# Update the template file with the variables
-TEMPLATE_VARIABLES: list = [
-    {
-        "<< dag_id >>": "business_analytics",
-        "<< database_name >>": "BA",
-        "<< table_name >>": "inventory"
-    }, {
-        "<< dag_id >>": "data_science",
-        "<< database_name >>": "DS",
-        "<< table_name >>": "daily_sales"
-    }, {
-        "<< dag_id >>": "machine_learning",
-        "<< database_name >>": "ML",
-        "<< table_name >>": "training_data"
-    }
-]
-
-...
-```
-
-Using a single template file, we now have spawned three DAGs each with the same tasks, but different parameters passed
-to those tasks. Your DAGs view in Airflow should now look a little something like the view below.
+Using a single set of default values, we now have spawned three DAGs each with the same tasks, but different parameters 
+passed to those tasks. Your DAGs view in Airflow should now look a little something like the view below.
 
 ![Dynamically-generated DAGs.](assets/dynamically_generated_dags.png)
 
-Congrats! Using DAG Factory, you've written a script to dynamically-generate DAGs using a single template! 
-
+Congrats! Using DAG Factory, you've dynamically-generated DAGs using a single set of default values and injected 
+parameters for each DAG.
 
 ## Resources
 
